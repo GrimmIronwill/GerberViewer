@@ -3,12 +3,380 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:GerberViewer"
         Title="Gerber Viewer"
-        Width="1200"
-        Height="800"
-        MinWidth="750"
-        MinHeight="450"
+        Width="1280"
+        Height="820"
+        MinWidth="860"
+        MinHeight="540"
         WindowStartupLocation="CenterScreen"
-        Background="#F3F4F6">
+        Background="#14171D"
+        Foreground="#E8EAEE"
+        FontFamily="Segoe UI"
+        FontSize="13"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        AllowDrop="True"
+        DragOver="Window_DragOver"
+        Drop="Window_Drop">
+
+    <Window.Resources>
+
+        <!-- ===== Палитра темы ===== -->
+        <SolidColorBrush x:Key="WindowBrush"      Color="#14171D"/>
+        <SolidColorBrush x:Key="PanelBrush"       Color="#1C2028"/>
+        <SolidColorBrush x:Key="ElevatedBrush"    Color="#242A34"/>
+        <SolidColorBrush x:Key="HoverBrush"       Color="#2A3140"/>
+        <SolidColorBrush x:Key="SelectedBrush"    Color="#263043"/>
+        <SolidColorBrush x:Key="LineBrush"        Color="#2E3541"/>
+        <SolidColorBrush x:Key="TextBrush"        Color="#E8EAEE"/>
+        <SolidColorBrush x:Key="MutedBrush"       Color="#8A93A3"/>
+        <SolidColorBrush x:Key="AccentBrush"      Color="#4C8DFF"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#6AA1FF"/>
+        <SolidColorBrush x:Key="DangerBrush"      Color="#F26D78"/>
+
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- ===== Кнопка панели инструментов ===== -->
+        <Style x:Key="ToolButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource ElevatedBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Root"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    SnapsToDevicePixels="True"/>
+                            <Border x:Name="Overlay"
+                                    Background="White"
+                                    Opacity="0"
+                                    CornerRadius="6"/>
+                            <ContentPresenter x:Name="Presenter"
+                                              Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Overlay" Property="Opacity" Value="0.08"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Overlay" Property="Opacity" Value="0.16"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.4"/>
+                                <Setter TargetName="Presenter" Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button"
+               BasedOn="{StaticResource ToolButton}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <!-- ===== Кнопка удаления слоя (крестик) ===== -->
+        <Style x:Key="CloseButton" TargetType="Button">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="Transparent"
+                                CornerRadius="5">
+                            <Path x:Name="Icon"
+                                  Data="M0,0 L8,8 M8,0 L0,8"
+                                  Stroke="{TemplateBinding Foreground}"
+                                  StrokeThickness="1.6"
+                                  Width="8"
+                                  Height="8"
+                                  Stretch="None"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background"
+                                        Value="{StaticResource HoverBrush}"/>
+                                <Setter TargetName="Icon" Property="Stroke"
+                                        Value="{StaticResource DangerBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===== Кнопка цвета в палитре ===== -->
+        <Style x:Key="PaletteButton" TargetType="Button">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                BorderThickness="2"
+                                BorderBrush="Transparent"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===== Цветной квадратик слоя (открывает палитру) ===== -->
+        <Style x:Key="SwatchToggle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTip" Value="Цвет и непрозрачность слоя"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                BorderThickness="2"
+                                BorderBrush="#40FFFFFF"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===== Флажок видимости ===== -->
+        <Style x:Key="VisibilityCheck" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTip" Value="Видимость слоя"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="18" Height="18" Background="Transparent">
+                            <Rectangle x:Name="Box"
+                                       RadiusX="5"
+                                       RadiusY="5"
+                                       StrokeThickness="1.5"
+                                       Stroke="#5A6473"
+                                       Fill="Transparent"/>
+                            <Path x:Name="Mark"
+                                  Data="M4.5,9.5 L7.8,12.5 L13.5,6"
+                                  Stroke="White"
+                                  StrokeThickness="2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Visibility="Collapsed"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Stroke"
+                                        Value="{StaticResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Fill"
+                                        Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Box" Property="Stroke"
+                                        Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===== Строка списка слоёв ===== -->
+        <Style x:Key="LayerItem" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <EventSetter Event="PreviewMouseRightButtonDown"
+                         Handler="LayerItem_PreviewMouseRightButtonDown"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Root"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background"
+                                        Value="{StaticResource HoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Root" Property="Background"
+                                        Value="{StaticResource SelectedBrush}"/>
+                                <Setter TargetName="Root" Property="BorderBrush"
+                                        Value="#3A5A9A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===== Тонкий тёмный скроллбар ===== -->
+        <Style x:Key="ScrollTrackButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Rectangle Fill="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ScrollThumb" TargetType="Thumb">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="Root"
+                                Background="#3A4250"
+                                CornerRadius="4"
+                                Margin="1"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#4B5566"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#5A6578"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="MinWidth" Value="8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track"
+                                   Orientation="{TemplateBinding Orientation}"
+                                   IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource ScrollTrackButton}"
+                                                  Command="ScrollBar.PageUpCommand"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource ScrollTrackButton}"
+                                                  Command="ScrollBar.PageDownCommand"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource ScrollThumb}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto"/>
+                    <Setter Property="MinWidth" Value="0"/>
+                    <Setter Property="Height" Value="8"/>
+                    <Setter Property="MinHeight" Value="8"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="Transparent">
+                                    <Track x:Name="PART_Track"
+                                           Orientation="{TemplateBinding Orientation}"
+                                           IsDirectionReversed="False">
+                                        <Track.DecreaseRepeatButton>
+                                            <RepeatButton Style="{StaticResource ScrollTrackButton}"
+                                                          Command="ScrollBar.PageLeftCommand"/>
+                                        </Track.DecreaseRepeatButton>
+                                        <Track.IncreaseRepeatButton>
+                                            <RepeatButton Style="{StaticResource ScrollTrackButton}"
+                                                          Command="ScrollBar.PageRightCommand"/>
+                                        </Track.IncreaseRepeatButton>
+                                        <Track.Thumb>
+                                            <Thumb Style="{StaticResource ScrollThumb}"/>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ===== Контекстное меню ===== -->
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="{StaticResource ElevatedBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -17,106 +385,293 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Панель инструментов -->
+        <!-- ===== Панель инструментов ===== -->
         <Border Grid.Row="0"
-                Background="White"
-                BorderBrush="#D1D5DB"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource LineBrush}"
                 BorderThickness="0,0,0,1"
-                Padding="10">
+                Padding="14,10">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="30" Height="30"
+                            CornerRadius="8"
+                            Background="{StaticResource AccentBrush}"
+                            Margin="0,0,10,0">
+                        <TextBlock Text="G"
+                                   Foreground="White"
+                                   FontWeight="Bold"
+                                   FontSize="16"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
 
-            <StackPanel Orientation="Horizontal">
-                <Button x:Name="OpenButton"
-                        Content="Загрузить файлы..."
-                        Padding="16,7"
-                        Margin="0,0,8,0"
-                        Click="OpenFiles_Click"/>
+                    <TextBlock Text="Gerber Viewer"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="0,0,18,0"/>
 
-                <Button Content="Вписать в окно"
-                        Padding="16,7"
-                        Margin="0,0,8,0"
-                        Click="Fit_Click"/>
+                    <Rectangle Width="1"
+                               Fill="{StaticResource LineBrush}"
+                               Margin="0,4,16,4"/>
 
-                <Button x:Name="ClearButton"
-                        Content="Очистить"
-                        Padding="16,7"
-                        Click="Clear_Click"/>
-            </StackPanel>
+                    <Button x:Name="OpenButton"
+                            Style="{StaticResource PrimaryButton}"
+                            Content="Открыть…"
+                            Click="OpenFiles_Click"/>
+
+                    <Button x:Name="FitButton"
+                            Style="{StaticResource ToolButton}"
+                            Content="Вписать в окно"
+                            Click="Fit_Click"/>
+
+                    <Button x:Name="ShowAllButton"
+                            Style="{StaticResource ToolButton}"
+                            Content="Показать все"
+                            Click="ShowAll_Click"/>
+
+                    <Button x:Name="HideAllButton"
+                            Style="{StaticResource ToolButton}"
+                            Content="Скрыть все"
+                            Click="HideAll_Click"/>
+
+                    <Button x:Name="ClearButton"
+                            Style="{StaticResource ToolButton}"
+                            Content="Очистить"
+                            Click="Clear_Click"/>
+                </StackPanel>
+
+                <ProgressBar x:Name="LoadingBar"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Center"
+                             Width="140"
+                             Height="4"
+                             IsIndeterminate="True"
+                             Visibility="Collapsed"
+                             BorderThickness="0"
+                             Background="{StaticResource LineBrush}"
+                             Foreground="{StaticResource AccentBrush}"/>
+            </Grid>
         </Border>
 
-        <!-- Основная область -->
+        <!-- ===== Основная область ===== -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="180"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="*" MinWidth="200"/>
+                <ColumnDefinition Width="300" MinWidth="220"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*" MinWidth="240"/>
             </Grid.ColumnDefinitions>
 
             <!-- Список слоёв -->
             <Border Grid.Column="0"
-                    Background="White"
-                    Padding="10">
-
+                    Background="{StaticResource PanelBrush}"
+                    Padding="12">
                 <DockPanel>
-                    <StackPanel DockPanel.Dock="Top"
-                                Margin="0,0,0,12">
-
-                        <TextBlock Text="Слои"
-                                   FontSize="18"
+                    <StackPanel DockPanel.Dock="Top" Margin="2,0,2,10">
+                        <TextBlock x:Name="LayersHeader"
+                                   Text="Слои"
+                                   FontSize="17"
                                    FontWeight="SemiBold"/>
-
-                        <TextBlock Text="Флажок управляет видимостью"
-                                   Foreground="#6B7280"
+                        <TextBlock Text="Слои рисуются в порядке списка: нижние поверх верхних."
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
                                    Margin="0,4,0,0"/>
                     </StackPanel>
 
-                    <ListBox x:Name="LayersList"
-                             BorderThickness="0"
-                             Background="Transparent"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="2,10,2,0"
+                               Text="Двойной щелчок или F2 — переименовать · Del — удалить · Пробел — видимость · ПКМ — меню слоя"/>
 
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="HorizontalContentAlignment"
-                                        Value="Stretch"/>
-                                <Setter Property="Padding" Value="2,6"/>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
+                    <ListBox x:Name="LayersList"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             SelectionMode="Single"
+                             ItemContainerStyle="{StaticResource LayerItem}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.CanContentScroll="False"
+                             KeyDown="LayersList_KeyDown">
 
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid ToolTip="{Binding FilePath}">
+                                <Grid Background="Transparent">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
+                                    <Grid.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Переименовать"
+                                                      InputGestureText="F2"
+                                                      Click="Rename_Click"/>
+                                            <MenuItem Header="Показать только этот слой"
+                                                      Click="Solo_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="Переместить вверх"
+                                                      Click="MoveUp_Click"/>
+                                            <MenuItem Header="Переместить вниз"
+                                                      Click="MoveDown_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="Удалить"
+                                                      InputGestureText="Del"
+                                                      Click="RemoveLayer_Click"/>
+                                        </ContextMenu>
+                                    </Grid.ContextMenu>
+
+                                    <!-- Видимость -->
                                     <CheckBox Grid.Column="0"
-                                              IsChecked="{Binding IsVisible,
-                                                  Mode=TwoWay,
-                                                  UpdateSourceTrigger=PropertyChanged}"
+                                              Style="{StaticResource VisibilityCheck}"
+                                              IsChecked="{Binding IsVisible, Mode=TwoWay}"
                                               VerticalAlignment="Center"
-                                              Margin="0,0,8,0"/>
+                                              Margin="0,0,10,0"/>
 
-                                    <Border Grid.Column="1"
-                                            Width="14"
-                                            Height="14"
-                                            CornerRadius="3"
-                                            Background="{Binding ColorBrush}"
-                                            VerticalAlignment="Center"
-                                            Margin="0,0,8,0"/>
+                                    <!-- Цвет -->
+                                    <ToggleButton x:Name="ColorToggle"
+                                                  Grid.Column="1"
+                                                  Style="{StaticResource SwatchToggle}"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,10,0">
+                                        <ToggleButton.Background>
+                                            <SolidColorBrush Color="{Binding Color}"/>
+                                        </ToggleButton.Background>
+                                    </ToggleButton>
 
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="{Binding Name}"
-                                                   FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis"/>
+                                    <Popup PlacementTarget="{Binding ElementName=ColorToggle}"
+                                           Placement="Bottom"
+                                           VerticalOffset="6"
+                                           HorizontalOffset="-8"
+                                           IsOpen="{Binding IsChecked, ElementName=ColorToggle, Mode=TwoWay}"
+                                           StaysOpen="False"
+                                           AllowsTransparency="True"
+                                           PopupAnimation="Fade">
+                                        <Border Background="{StaticResource ElevatedBrush}"
+                                                BorderBrush="{StaticResource LineBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Padding="12"
+                                                Margin="8">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="18"
+                                                                  ShadowDepth="4"
+                                                                  Opacity="0.45"/>
+                                            </Border.Effect>
+
+                                            <StackPanel Width="192">
+                                                <TextBlock Text="Цвет слоя"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           FontSize="11"
+                                                           Margin="0,0,0,6"/>
+
+                                                <UniformGrid Columns="6" HorizontalAlignment="Left">
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#50DC82" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#FF646E" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#5AA0FF" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#FFCD50" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#C878FF" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#50E1E6" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#FF9B4B" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#DCE1EB" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#2ECC71" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#E74C3C" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#3498DB" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#F1C40F" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#9B59B6" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#1ABC9C" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#E67E22" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#95A5A6" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#B8E986" Click="PaletteColor_Click"/>
+                                                    <Button Style="{StaticResource PaletteButton}" Background="#FF7EB6" Click="PaletteColor_Click"/>
+                                                </UniformGrid>
+
+                                                <TextBlock Text="Непрозрачность"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           FontSize="11"
+                                                           Margin="0,10,0,4"/>
+
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right"
+                                                               Width="42"
+                                                               TextAlignment="Right"
+                                                               VerticalAlignment="Center"
+                                                               Text="{Binding Opacity, StringFormat={}{0:P0}}"/>
+                                                    <Slider Minimum="0.15"
+                                                            Maximum="1"
+                                                            Value="{Binding Opacity, Mode=TwoWay}"
+                                                            IsMoveToPointEnabled="True"
+                                                            VerticalAlignment="Center"
+                                                            Margin="0,0,8,0"/>
+                                                </DockPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+
+                                    <!-- Имя и описание -->
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsVisible}" Value="False">
+                                                        <Setter Property="Opacity" Value="0.45"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+
+                                        <Grid>
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Background="Transparent"
+                                                       ToolTip="Двойной щелчок — переименовать"
+                                                       MouseLeftButtonDown="LayerName_MouseLeftButtonDown">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+
+                                            <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=Explicit}"
+                                                     Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                                                     IsVisibleChanged="NameEditor_IsVisibleChanged"
+                                                     KeyDown="NameEditor_KeyDown"
+                                                     LostKeyboardFocus="NameEditor_LostKeyboardFocus"
+                                                     Background="{StaticResource WindowBrush}"
+                                                     Foreground="{StaticResource TextBrush}"
+                                                     CaretBrush="{StaticResource TextBrush}"
+                                                     SelectionBrush="{StaticResource AccentBrush}"
+                                                     BorderBrush="{StaticResource AccentBrush}"
+                                                     BorderThickness="1"
+                                                     Padding="4,2"/>
+                                        </Grid>
 
                                         <TextBlock Text="{Binding Description}"
-                                                   Foreground="#6B7280"
+                                                   ToolTip="{Binding FilePath}"
+                                                   Foreground="{StaticResource MutedBrush}"
                                                    FontSize="11"
-                                                   Margin="0,3,0,0"
-                                                   TextWrapping="Wrap"/>
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,3,0,0"/>
                                     </StackPanel>
+
+                                    <!-- Удаление -->
+                                    <Button Grid.Column="3"
+                                            Style="{StaticResource CloseButton}"
+                                            ToolTip="Удалить слой"
+                                            VerticalAlignment="Center"
+                                            Margin="6,0,0,0"
+                                            Click="RemoveLayer_Click"/>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -125,33 +680,100 @@
             </Border>
 
             <GridSplitter Grid.Column="1"
-                          Width="5"
+                          Width="6"
                           HorizontalAlignment="Stretch"
-                          Background="#D1D5DB"/>
+                          Background="{StaticResource WindowBrush}"
+                          BorderThickness="0"/>
 
             <!-- Камера / отрисовка -->
-            <local:GerberViewport x:Name="Viewport"
-                                  Grid.Column="2" Margin="0,0,5,0"/>
+            <Grid Grid.Column="2">
+                <local:GerberViewport x:Name="Viewport"
+                                      MouseMove="Viewport_MouseMove"
+                                      MouseLeave="Viewport_MouseLeave"/>
+
+                <!-- Пустое состояние -->
+                <Grid x:Name="EmptyHint"
+                      IsHitTestVisible="False"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+                    <Rectangle RadiusX="14"
+                               RadiusY="14"
+                               Stroke="#3A4250"
+                               StrokeThickness="1.5"
+                               StrokeDashArray="5 4"
+                               Fill="#0FFFFFFF"/>
+
+                    <StackPanel Margin="48,40">
+                        <Path Data="M12,3 L21,8 L12,13 L3,8 Z M3,12 L12,17 L21,12 M3,16 L12,21 L21,16"
+                              Stroke="{StaticResource AccentBrush}"
+                              StrokeThickness="1.6"
+                              StrokeLineJoin="Round"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Width="56"
+                              Height="56"
+                              Stretch="Uniform"
+                              HorizontalAlignment="Center"/>
+
+                        <TextBlock Text="Нет загруженных слоёв"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,14,0,6"/>
+
+                        <TextBlock Text="Перетащите файлы Gerber в окно или нажмите «Открыть…»"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   HorizontalAlignment="Center"/>
+
+                        <TextBlock Text="Колесо — масштаб · Средняя/правая кнопка — перемещение · Двойной щелчок — вписать"
+                                   Foreground="#6B7484"
+                                   FontSize="11"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,18,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
         </Grid>
 
-        <!-- Строка состояния -->
+        <!-- ===== Строка состояния ===== -->
         <Border Grid.Row="2"
-                Padding="10,7"
-                Background="White"
-                BorderBrush="#D1D5DB"
-                BorderThickness="0,1,0,0">
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="14,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <StackPanel>
                 <TextBlock x:Name="StatusText"
+                           Grid.Column="0"
                            Text="Загрузите один или несколько файлов Gerber."
-                           TextWrapping="Wrap"/>
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"/>
 
-                <TextBlock Margin="0,3,0,0"
-                           FontSize="11"
-                           Foreground="#6B7280"
-                           TextWrapping="Wrap"
-                           Text="Колесо — масштаб; средняя или правая кнопка — перемещение; двойной щелчок — вписать."/>
-            </StackPanel>
+                <TextBlock x:Name="CursorText"
+                           Grid.Column="1"
+                           FontFamily="Consolas"
+                           Foreground="{StaticResource MutedBrush}"
+                           VerticalAlignment="Center"
+                           Margin="16,0"
+                           Text="X —          Y —          мм"/>
+
+                <Border Grid.Column="2"
+                        Background="{StaticResource ElevatedBrush}"
+                        CornerRadius="5"
+                        Padding="8,2">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Масштаб "
+                                   Foreground="{StaticResource MutedBrush}"/>
+                        <TextBlock x:Name="ZoomText"
+                                   FontFamily="Consolas"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Border>
     </Grid>
 </Window>

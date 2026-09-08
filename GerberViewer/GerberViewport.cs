@@ -25,12 +25,32 @@ public sealed class GerberViewport : FrameworkElement
     private bool _isPanning;
     private Point _lastMousePosition;
 
+    // ДОБАВЛЕНО: уведомление о смене масштаба или смещения
+    // для строки состояния.
+    public event EventHandler? ViewChanged;
+
+    // ДОБАВЛЕНО: текущий масштаб, пикселей на миллиметр.
+    public double Scale => _scale;
+
     public GerberViewport()
     {
         ClipToBounds = true;
         Focusable = true;
 
         BackgroundBrush.Freeze();
+    }
+
+    // ДОБАВЛЕНО: перевод экранной точки в мировые координаты (мм).
+    public Point ScreenToWorld(Point screen)
+    {
+        return new Point(
+            (screen.X - _offset.X) / _scale,
+            (_offset.Y - screen.Y) / _scale);
+    }
+
+    private void OnViewChanged()
+    {
+        ViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetLayers(ObservableCollection<GerberLayer> layers)
@@ -162,6 +182,9 @@ public sealed class GerberViewport : FrameworkElement
             ActualHeight / 2 + centerY * _scale);
 
         InvalidateVisual();
+
+        // ДОБАВЛЕНО
+        OnViewChanged();
     }
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)
@@ -187,6 +210,9 @@ public sealed class GerberViewport : FrameworkElement
 
         InvalidateVisual();
         e.Handled = true;
+
+        // ДОБАВЛЕНО
+        OnViewChanged();
     }
 
     protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -227,6 +253,9 @@ public sealed class GerberViewport : FrameworkElement
         _lastMousePosition = current;
 
         InvalidateVisual();
+
+        // ДОБАВЛЕНО
+        OnViewChanged();
     }
 
     protected override void OnMouseUp(MouseButtonEventArgs e)
