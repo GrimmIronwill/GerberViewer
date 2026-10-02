@@ -16,6 +16,10 @@ public sealed partial class GerberParser
 {
     private readonly List<string> _warnings = [];
 
+    // Один раз предупреждаем о превышении разрядности FS.
+    // Число дробных разрядов при этом не изменяем.
+    private bool _coordinateWidthWarningAdded;
+
     private bool _ignoreUnknownExtendedCommands;
     private int _commandNumber;
 
@@ -1041,31 +1045,85 @@ public sealed partial class GerberParser
 
         // Некоторые генераторы записывают явную десятичную точку.
         if (text.Contains('.'))
-            return ParseNumber(text) * _unitFactor;
+        {
+            double explicitValue = ParseNumber(text) * _unitFactor;
 
-        bool negative = text.StartsWith('-');
+            if (!double.IsFinite(explicitValue))
+            {
+                throw new FormatException(
+                    $"Числовое переполнение в координате '{text}'.");
+            }
 
-        string digits = text.TrimStart('+', '-');
+            return explicitValue;
+        }
+
+        if (text.Length == 0)
+            throw new FormatException("Пустая координата.");
+
+        bool negative = text[0] == '-';
+
+        string digits = text[0] is '+' or '-'
+            ? text[1..]
+            : text;
+
+        if (digits.Length == 0 ||
+            digits.Any(c => c is < '0' or > '9'))
+        {
+            throw new FormatException(
+                $"Неверная координата: '{text}'.");
+        }
 
         int totalDigits = integerDigits + fractionDigits;
 
         if (digits.Length > totalDigits)
         {
-            throw new FormatException(
-                $"Координата '{text}' длиннее заданного формата FS.");
+            if (_trailingZeroSuppression)
+            {
+                // При подавлении конечных нулей не пытаемся
+                // автоматически исправлять несоответствие формату.
+                throw new FormatException(
+                    $"Координата '{text}' длиннее формата FS " +
+                    $"{integerDigits}.{fractionDigits} " +
+                    "при подавлении конечных нулей.");
+            }
+
+            // Режим L: десятичная точка определяется количеством
+            // дробных разрядов. Дополнительные цифры относятся
+            // к целой части, а не отбрасываются справа.
+            if (!_coordinateWidthWarningAdded)
+            {
+                char axis = xAxis ? 'X' : 'Y';
+
+                AddWarning(
+                    $"Координата {axis}{text} превышает объявленную " +
+                    $"разрядность FS {integerDigits}.{fractionDigits}. " +
+                    "Разрешены дополнительные целые разряды; " +
+                    "число дробных разрядов сохранено. " +
+                    "Проверьте формат координат исходного файла.");
+
+                _coordinateWidthWarningAdded = true;
+            }
         }
 
         if (_trailingZeroSuppression)
             digits = digits.PadRight(totalDigits, '0');
 
-        double value = double.Parse(digits, Invariant);
+        double value = ParseNumber(digits);
 
         value /= Math.Pow(10, fractionDigits);
 
         if (negative)
             value = -value;
 
-        return value * _unitFactor;
+        value *= _unitFactor;
+
+        if (!double.IsFinite(value))
+        {
+            throw new FormatException(
+                $"Числовое переполнение в координате '{text}'.");
+        }
+
+        return value;
     }
 
     private List<Point> BuildArc(
